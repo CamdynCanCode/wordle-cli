@@ -1,1 +1,0 @@
-fix bin entry, rename main to index.js
