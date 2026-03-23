@@ -1,10 +1,10 @@
 {
   "name": "wordle-cli-game",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Wordle in your terminal — no internet, no dependencies",
   "main": "wordle.js",
   "bin": {
-    "wordle": "./wordle.js"
+    "wordle": "./wordle.cmd"
   },
   "scripts": {
     "start": "node wordle.js"
@@ -15,16 +15,12 @@
     "words.txt",
     "README.md"
   ],
-
   "author": "Camdyn",
-
   "repository": {
     "type": "git",
-    "url": "https://github.com/CamdynCanCode/wordle-cli.git"
+    "url": "git+https://github.com/CamdynCanCode/wordle-cli.git"
   },
-
   "homepage": "https://github.com/CamdynCanCode/wordle-cli#readme",
-
   "engines": { "node": ">=14" },
   "keywords": ["wordle","cli","game","terminal","puzzle"],
   "license": "MIT"
