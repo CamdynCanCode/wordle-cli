@@ -1,16 +1,17 @@
 {
   "name": "wordle-cli-game",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Wordle in your terminal — no internet, no dependencies",
-  "main": "wordle.js",
+  "main": "index.js",
   "bin": {
-    "wordle": "./wordle.cmd"
+    "wordle": "./wordle"
   },
   "scripts": {
-    "start": "node wordle.js"
+    "start": "node index.js"
   },
   "files": [
-    "wordle.js",
+    "wordle",
+    "index.js",
     "wordle.cmd",
     "words.txt",
     "README.md"
