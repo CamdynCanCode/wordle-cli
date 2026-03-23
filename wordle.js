@@ -5,16 +5,12 @@ const path = require("path");
 const fs   = require("fs");
 
 // ─── Load word list ───────────────────────────────────────────────────────────
-// Expects words.txt — one word per line, any case. Example:
-//   aback
-//   abase
-//   abate
 const WORDS_FILE = path.join(__dirname, "words.txt");
 let WORDS, WORD_POOL;
 try {
   const raw = fs.readFileSync(WORDS_FILE, "utf8");
   WORD_POOL = raw
-    .split(/\r?\n/)                    // handles Windows \r\n and Unix \n
+    .split(/\r?\n/)
     .map(w => w.toUpperCase().trim())
     .filter(w => w.length === 5 && /^[A-Z]+$/.test(w));
   if (WORD_POOL.length === 0) throw new Error("No valid 5-letter words found in words.txt");
@@ -33,11 +29,9 @@ const MAX_GUESSES = 6;
 const WORD_LEN    = 5;
 
 // ─── ANSI ─────────────────────────────────────────────────────────────────────
-// \x1b[3J  = clear scrollback buffer
-// \x1b[2J  = clear visible screen
-// \x1b[H   = move cursor to top-left
-// Together these wipe everything so output never scrolls or accumulates.
-const WIPE = "\x1b[3J\x1b[2J\x1b[H";
+const ESC  = "\x1b[";
+// Clear visible screen + scrollback, then home — order matters on Windows
+const WIPE = "\x1b[2J\x1b[3J\x1b[H";
 const HIDE = "\x1b[?25l";
 const SHOW = "\x1b[?25h";
 const fg = {
@@ -93,8 +87,8 @@ function renderRow(letters, states) {
   const cells = [];
   for (let i = 0; i < WORD_LEN; i++) {
     const ch = ` ${letters[i] || " "} `;
-    if (!letters[i])              cells.push(tile.empty("   "));
-    else if (!states)             cells.push(tile.empty(ch));
+    if (!letters[i])                  cells.push(tile.empty("   "));
+    else if (!states)                 cells.push(tile.empty(ch));
     else if (states[i] === "correct") cells.push(tile.correct(ch));
     else if (states[i] === "present") cells.push(tile.present(ch));
     else                              cells.push(tile.absent(ch));
@@ -129,13 +123,27 @@ function renderKeyboard(lmap) {
   ).join("\n");
 }
 
-// ─── Draw — wipes terminal completely then repaints from scratch ──────────────
+// ─── Draw ─────────────────────────────────────────────────────────────────────
+// Moves cursor to 1,1 and rewrites every line in-place so the terminal
+// never scrolls. On the very first call we do a hard WIPE first.
+let firstDraw = true;
+
 function draw(state) {
   const { guesses, scores, answer, currentInput, message, gameOver, won } = state;
   const lmap = buildLetterMap(guesses, scores);
 
-  let out = WIPE + HIDE;
+  let out = "";
 
+  if (firstDraw) {
+    // Hard clear on startup so any shell prompt residue is gone
+    out += WIPE;
+    firstDraw = false;
+  } else {
+    // Move cursor to top-left and overwrite — never appends new lines
+    out += "\x1b[H";
+  }
+
+  out += HIDE;
   out += "\n";
   out += fg.bold(fg.cyan("  ╔══════════════════════════╗")) + "\n";
   out += fg.bold(fg.cyan("  ║")) + fg.bold("       W O R D L E        ") + fg.bold(fg.cyan("║")) + "\n";
@@ -145,7 +153,7 @@ function draw(state) {
   out += renderBoard(guesses, scores, currentInput) + "\n\n";
   out += renderKeyboard(lmap) + "\n\n";
 
-  // Message row — always occupies space so layout never jumps
+  // Message line — fixed height so layout never shifts
   out += message ? `  ${fg.red("▶")} ${fg.white(message)}\n\n` : "\n\n";
 
   if (gameOver) {
@@ -163,6 +171,9 @@ function draw(state) {
     out += `  > ${[typed, blanks].filter(Boolean).join(" ")}\n`;
     out += `\n  ${fg.dim("[type letters]  [ENTER = submit]  [BACKSPACE = delete]  [CTRL+C = quit]")}\n`;
   }
+
+  // Erase from cursor to end of screen so no stale lines linger below
+  out += "\x1b[J";
 
   process.stdout.write(out);
 }
@@ -201,18 +212,19 @@ function main() {
     msgTimer = setTimeout(() => { state.message = ""; draw(state); }, 2000);
   }
 
-  draw(state);
+  // Small delay so the shell finishes printing its own prompt before we wipe
+  setTimeout(() => draw(state), 50);
 
   process.stdin.on("data", key => {
-    if (key === "\u0003") exit(0);                      // Ctrl+C
+    if (key === "\u0003") exit(0);
 
     if (state.gameOver) {
-      if      (key.toLowerCase() === "y") { state = newState(); draw(state); }
+      if      (key.toLowerCase() === "y") { firstDraw = true; state = newState(); draw(state); }
       else if (key.toLowerCase() === "n") exit(0);
       return;
     }
 
-    if (key === "\r" || key === "\n") {                 // Enter — submit
+    if (key === "\r" || key === "\n") {
       const guess = state.currentInput.toUpperCase();
       if (guess.length < WORD_LEN)  { flash("Not enough letters!");           return; }
       if (!WORDS.has(guess))         { flash(`'${guess}' not in word list.`); return; }
@@ -228,7 +240,7 @@ function main() {
       return;
     }
 
-    if (key === "\x7f" || key === "\b") {               // Backspace
+    if (key === "\x7f" || key === "\b") {
       state.currentInput = state.currentInput.slice(0, -1);
       draw(state);
       return;
